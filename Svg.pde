@@ -7,16 +7,16 @@ class Svg {
   }
   
   void drawPaths() {
-    for (int i=0; i<paths.size(); i++) {
-      paths.get(i).drawPath();
+    for (SvgPath path : paths) {
+      path.drawPath();
     }
   }
   
   String[] writePaths() {
     ArrayList<String> returnList = new ArrayList<String>();
     returnList.add(writeHeader());
-    for (int i=0; i<paths.size(); i++) {
-      returnList.add(paths.get(i).writePath());
+    for (SvgPath path : paths) {
+      returnList.add(path.writePath());
     }
     returnList.add(writeFooter());
     return returnList.toArray(new String[returnList.size()]);
@@ -57,6 +57,12 @@ class Svg {
     paths.add(sp);  
   }
   
+  void refine() {
+    for (SvgPath path : paths) {
+      path.refine();
+    }
+  }
+  
   String writeHeader() {
     String returns = "";
     returns += "<?xml version=\"1.0\" encoding=\"utf-8\"?>" + "\n";
@@ -81,6 +87,8 @@ class SvgPath {
   color strokeColor;
   float strokeWidth;
   boolean closed;
+  int smoothReps = 10;
+  int splitReps = 2;
   
   void init() {
     points = new ArrayList<PVector>();
@@ -111,8 +119,8 @@ class SvgPath {
   }
   
   void addPoints(ArrayList<PVector> p) {
-    for (int i=0; i<p.size(); i++) {
-      points.add(p.get(i));
+    for (PVector pv : p) {
+      points.add(pv);
     }
   }  
   
@@ -126,12 +134,19 @@ class SvgPath {
   }
   
   void drawPath() {
-    stroke(strokeColor);
+    if (alpha(strokeColor)==0) {
+      noStroke();
+    } else {
+      stroke(strokeColor);
+    }
     strokeWeight(strokeWidth);
-    fill(fillColor);
+    if (alpha(fillColor)==0) {
+      noFill();
+    } else {
+      fill(fillColor);
+    }
     beginShape();
-    for (int i=0; i<points.size(); i++) {
-      PVector p = points.get(i);
+    for (PVector p : points) {
       vertex(p.x, p.y);
     }
     endShape();
@@ -158,4 +173,41 @@ class SvgPath {
     return returns;
   }
 
+  void smoothStroke() {
+        float weight = 18;
+        float scale = 1.0 / (weight + 2);
+        int nPointsMinusTwo = points.size() - 2;
+        PVector lower, upper, center;
+
+        for (int i = 1; i < nPointsMinusTwo; i++) {
+            lower = points.get(i-1);
+            center = points.get(i);
+            upper = points.get(i+1);
+
+            center.x = (lower.x + weight * center.x + upper.x) * scale;
+            center.y = (lower.y + weight * center.y + upper.y) * scale;
+        }
+  }
+
+  void splitStroke() {
+    for (int i = 1; i < points.size(); i+=2) {
+      PVector center = points.get(i);
+      PVector lower = points.get(i-1);
+      float x = (center.x + lower.x) / 2;
+      float y = (center.y + lower.y) / 2;
+      float z = (center.z + lower.z) / 2;
+      PVector p = new PVector(x, y, z);
+      points.add(i, p);
+    }
+  }
+
+  void refine() {
+    for (int i=0; i<splitReps; i++) {
+      splitStroke();  
+      smoothStroke();  
+    }
+    for (int i=0; i<smoothReps - splitReps; i++) {
+      smoothStroke();    
+     }
+  }
 }
